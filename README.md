@@ -8,7 +8,7 @@ LAST is an extended version of [LibRerank](https://github.com/LibRerank-Communit
 
 ```
 git clone this repo
-cd MTL_librerank
+cd LAST
 make init 
 ```
 
