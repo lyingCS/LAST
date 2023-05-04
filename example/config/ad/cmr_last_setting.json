@@ -1,0 +1,22 @@
+{
+  "model_type": "CMR_generator",
+  "data_set_name": "ad",
+  "initial_ranker": "lambdaMART",
+  "lr": 1e-4,
+  "l2_reg": 1e-4,
+  "batch_size": 16,
+  "max_time_len": 10,
+  "metric_scope": [1, 3, 5, 10],
+  "eb_dim": 16,
+  "hidden_size": 64,
+  "epoch_num": 50,
+  "save_dir": "./model/",
+  "data_dir": "./Data/ad/",
+  "evaluator_path": "./model//save_model_ad/10/202303071105_lambdaMART_LAST_evaluator_16_0.0005_0.0002_64_16_0.8_1.0",
+  "controllable": false,
+  "with_evaluator_metrics": true,
+  "auc_rewards_type": "iv",
+  "div_rewards_type": "iv",
+  "acc_prefer": 1,
+  "evaluator_type": "last"
+}
