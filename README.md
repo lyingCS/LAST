@@ -4,7 +4,7 @@ LAST is an extended version of [LibRerank](https://github.com/LibRerank-Communit
 
 ## Quick Started
 
-#### Install repo from source
+### Install repo from source
 
 ```
 git clone this repo
@@ -12,7 +12,7 @@ cd MTL_librerank
 make init 
 ```
 
-#### Decompress evaluator checkpoint
+### Decompress evaluator checkpoint
 
 For facilitate the training of the generator, we provide a  version of the checkpoints of CMR_evaluator that have been pretrained. We first need to decompress it.
 
