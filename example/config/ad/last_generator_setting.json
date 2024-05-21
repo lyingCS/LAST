@@ -14,9 +14,9 @@
   "data_dir": "./Data/ad/",
   "evaluator_path": "./model//save_model_ad/10/202303091111_lambdaMART_LAST_evaluator_16_0.0005_0.0002_64_16_0.8_1.0",
   "controllable": false,
-  "auc_rewards_type": "iv",
+  "auc_rewards_type": "pv_ndcg",
   "div_rewards_type": "iv",
-  "acc_prefer": 0.0,
+  "acc_prefer": 1.0,
   "evaluator_type": "last",
   "with_evaluator_metrics": false
 }

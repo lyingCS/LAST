@@ -4,6 +4,7 @@ import random
 import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 from librerank.utils import *
 from librerank.reranker import *
 from librerank.rl_reranker import *
@@ -415,6 +416,14 @@ def train(train_file, test_file, feature_size, max_time_len, itm_spar_fnum, itm_
                 act_idx_out, act_probs_one, rl_sp_outputs, rl_de_outputs, mask_arr, lp_sp_data, lp_de_data, _, enc_input, \
                 cate_chosen, cate_seq = model.predict(data_batch, train_prefer, params.l2_reg)
 
+
+                #print(act_idx_out)
+                #print(data_batch[4])
+                #labels = np.array(model.build_label_reward(data_batch[4], act_idx_out))
+                #auc_rewards = np.array(model.build_ndcg_reward(labels))
+                #base_auc_rewards = np.array(model.build_ndcg_reward(data_batch[4]))
+                #auc_rewards -= base_auc_rewards
+                #print(auc_rewards)
                 auc_rewards = evaluator.predict(rl_sp_outputs, rl_de_outputs, data_batch[6])
                 # base_auc_rewards = evaluator.predict(np.array(data_batch[2]), np.array(data_batch[3]), data_batch[6])
                 # auc_rewards = auc_rewards-base_auc_rewards
@@ -449,12 +458,22 @@ def train(train_file, test_file, feature_size, max_time_len, itm_spar_fnum, itm_
                     model.rerank(data_batch, params.keep_prob, train_prefer=train_prefer)
 
                 rl_sp_outputs, rl_de_outputs = model.build_ft_chosen(data_batch, training_prediction_order)
-                rerank_click = np.array(model.build_label_reward(data_batch[4], training_prediction_order))
-                auc_rewards = evaluator.predict(np.array(data_batch[1]), rl_sp_outputs, rl_de_outputs,
-                                                data_batch[6])
-                base_auc_rewards = evaluator.predict(np.array(data_batch[1]), np.array(data_batch[2]),
-                                                     np.array(data_batch[3]), data_batch[6])
-                auc_rewards -= base_auc_rewards
+                #rerank_click = np.array(model.build_label_reward(data_batch[4], training_prediction_order))
+                #print(training_prediction_order)
+                if params.auc_rewards_type == 'iv':
+                    auc_rewards = evaluator.predict(np.array(data_batch[1]), rl_sp_outputs, rl_de_outputs,
+                                                    data_batch[6])
+                    base_auc_rewards = evaluator.predict(np.array(data_batch[1]), np.array(data_batch[2]),
+                                                         np.array(data_batch[3]), data_batch[6])
+                    auc_rewards -= base_auc_rewards
+                elif params.auc_rewards_type == 'label':
+                    auc_rewards = np.array(model.build_label_reward(data_batch[4], training_prediction_order))
+                    auc_rewards -= np.mean(auc_rewards, axis=1).reshape(-1, 1)
+                elif params.auc_rewards_type == 'pv_ndcg':
+                    labels = np.array(model.build_label_reward(data_batch[4], training_prediction_order))
+                    auc_rewards = np.array(model.build_ndcg_reward(labels))
+                    base_auc_rewards = np.array(model.build_ndcg_reward(data_batch[4]))
+                    auc_rewards -= base_auc_rewards
 
                 # _, base_div_rewards = model.build_erria_reward(cate_seq, cate_seq)  # rank base rerank new
                 # _, div_rewards = model.build_erria_reward(cate_chosen, cate_seq)
@@ -688,7 +707,7 @@ def reranker_parse_args():
     parser.add_argument('--max_time_len', default=10, type=int, help='max time length')
     parser.add_argument('--save_dir', type=str, default='./', help='dir that saves logs and model')
     parser.add_argument('--data_dir', type=str, default='./data/ad/', help='data dir')
-    parser.add_argument('--model_type', default='CMR_generator',
+    parser.add_argument('--model_type', default='LAST_generator',
                         choices=['PRM', 'DLCM', 'SetRank', 'GSF', 'miDNN', 'Seq2Slate', 'EGR_evaluator',
                                  'EGR_generator', 'CMR_generator', 'CMR_evaluator', 'LAST_generator',
                                  'LAST_evaluator'],
@@ -730,8 +749,8 @@ def reranker_parse_args():
 
 if __name__ == '__main__':
     # parameters
-    random.seed(1234)
-    set_global_determinism(1234)
+    random.seed(1237)
+    set_global_determinism(1237)
     parse = reranker_parse_args()
     if parse.setting_path:
         parse = load_parse_from_json(parse, parse.setting_path)

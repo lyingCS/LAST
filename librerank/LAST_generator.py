@@ -134,14 +134,18 @@ class LAST_generator(CMR_generator):
 
         # extra predictions
         sample_manner_list = ["Thompson_sampling"]
-        # sample_manner_list = ["greedy"]
-        # step_sizes = [-6.0, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 6.0]  # [-6 ~ 6]
-        # step_sizes = [-18, -15, -12, -9 ,-6]
-        step_sizes = list(np.arange(1, 10, 1))
-        # step_sizes = list(np.arange(-5, 0, 1))
-        # step_sizes = [-2.0, -1.0, 1.0, 2.0]  # [-6 ~ 6]
+        #sample_manner_list = ["greedy"]
+        #step_sizes = [12]
+        
+        num = 5
+        low = 6
+        high = 10
+        inter = (high-low)/(num-1)
+
+        step_sizes = list(np.arange(low, high, inter))
         simple_sampling_number = len(step_sizes)
-        step_sizes = [0.0] * simple_sampling_number + step_sizes
+        step_sizes = [0] * simple_sampling_number + step_sizes
+        #step_sizes = [8] * simple_sampling_number + step_sizes
         self.step_sizes = step_sizes
         for sample_manner in sample_manner_list:
             for step_size in step_sizes:

@@ -4,6 +4,7 @@ import random
 import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 from librerank.utils import *
 from librerank.reranker import *
 from librerank.CMR_generator import *
@@ -18,64 +19,48 @@ import json
 
 
 # import seaborn as sns
-def eval_last(model, data, batch_size, isrank, metric_scope, _print=False, evaluator=None):
+def eval_last(model, data, batch_size, isrank, metric_scope, _print=False):
     step_sizes = len(model.step_sizes)
     preds_cmr, preds_last = [], []
-    losses = []
 
     data_size = len(data[0])
     batch_num = data_size // batch_size
     print('eval', batch_size, batch_num)
 
-    # eva_cmr_ave, eva_last_ave = [[] for _ in range(len(metric_scope))], [[] for _ in range(len(metric_scope))]
     eva_cmr_ave, eva_last_ave = [], []
     t = time.time()
     for batch_no in range(batch_num):
         data_batch = get_aggregated_batch(data, batch_size=batch_size, batch_no=batch_no)
         inference_order, inference_predict, loss, cate_seq, cate_chosen = model.inference(data_batch)
-        losses.append(loss)
-        rl_sp_outputs, rl_de_outputs = model.build_ft_chosen(data_batch, inference_order)
                             
-        #labels = np.array(model.build_label_reward(data_batch[4], inference_order))
-        #auc_rewards = np.array(model.build_ndcg_reward(labels))
-        #base_auc_rewards = np.array(model.build_ndcg_reward(data_batch[4]))
-        #auc_rewards -= base_auc_rewards
-        auc_rewards = evaluator.predict(np.array(data_batch[1]), rl_sp_outputs, rl_de_outputs, data_batch[6])
-        base_auc_rewards = evaluator.predict(np.array(data_batch[1]), np.array(data_batch[2]), np.array(data_batch[3]),
-                                             data_batch[6])
-        auc_rewards -= base_auc_rewards
+        labels = np.array(model.build_label_reward(data_batch[4], inference_order))
+        ndcg_rewards = np.array(model.build_ndcg_reward(labels))
+        base_ndcg_rewards = np.array(model.build_ndcg_reward(data_batch[4]))
+        ndcg_rewards -= base_ndcg_rewards
 
-        # _, base_div_rewards = model.build_erria_reward(cate_seq, cate_seq)  # rank base rerank new
-        # _, div_rewards = model.build_erria_reward(cate_chosen, cate_seq)
-        base_div_rewards = model.build_alpha_ndcg_reward(cate_seq, cate_seq)  # rank base rerank new
-        div_rewards = model.build_alpha_ndcg_reward(cate_chosen, cate_seq)
-        div_rewards -= base_div_rewards
-
-        pred, order = model.instant_learning(data_batch, auc_rewards, div_rewards, inference_order)  # pred: [L, B, N]
+        pred, order = model.instant_learning(data_batch, ndcg_rewards, ndcg_rewards, inference_order)  # pred: [L, B, N]
         batch_ave_steps = []  # [L, scope_num, B]
         for i in range(step_sizes):
-            batch_sum, batch_ave = evaluator_metrics(data_batch, order[i], metric_scope, model,
-                                                     evaluator)  # [scope_num, B]
             res = list(evaluate_multi(data_batch[4], pred[i], list(map(lambda a: [i[1] for i in a], data_batch[2])), metric_scope, isrank, _print))  # [3+2, scope_num, ]
-            div_metrics = res[-1][-1]
             ndcg_metrics = res[1][-1]
-            batch_ave = np.array(batch_ave)*0+np.array(ndcg_metrics)*1
-            batch_ave_steps.append(batch_ave)
-            #batch_ave_steps.append(ndcg_metrics)
+            batch_ave_steps.append(ndcg_metrics)
+        #print(batch_ave_steps)
         batch_ave_steps_cmr = np.array(batch_ave_steps[:step_sizes // 2])
         batch_ave_steps_last = np.array(batch_ave_steps[step_sizes // 2:])
-        best_cmr_idx = np.argmax(batch_ave_steps_cmr[:, -1, :], axis=0)
-        best_last_idx = np.argmax(batch_ave_steps_last[:, -1, :], axis=0)
+        best_cmr_idx = np.argmax(batch_ave_steps_cmr)
+        best_last_idx = np.argmax(batch_ave_steps_last)
+        #print(best_cmr_idx, best_last_idx)
         pred = np.array(pred)
-        pred_cmr = pred[best_cmr_idx, np.arange(pred.shape[1]), :]
-        pred_last = pred[step_sizes//2 + best_last_idx, np.arange(pred.shape[1]), :]
+        pred_cmr = pred[best_cmr_idx]
+        pred_last = pred[step_sizes//2 + best_last_idx]
+        #print(pred_cmr, pred_last)
         preds_cmr.extend(pred_cmr)
         preds_last.extend(pred_last)
-        batch_cmr_metrics = batch_ave_steps_cmr[best_cmr_idx, :, np.arange(pred.shape[1])]
-        batch_last_metrics = batch_ave_steps_last[best_last_idx, :, np.arange(pred.shape[1])]
+        batch_cmr_metrics = batch_ave_steps_cmr[best_cmr_idx]
+        batch_last_metrics = batch_ave_steps_last[best_last_idx]
         # for i in range(len(metric_scope)):
-        eva_cmr_ave.extend(batch_cmr_metrics)
-        eva_last_ave.extend(batch_last_metrics)
+        eva_cmr_ave.append(batch_cmr_metrics)
+        eva_last_ave.append(batch_last_metrics)
 
     labels = data[4]
     cate_ids = list(map(lambda a: [i[1] for i in a], data[2]))
@@ -83,16 +68,14 @@ def eval_last(model, data, batch_size, isrank, metric_scope, _print=False, evalu
     print("multi-CMR")
     res = list(evaluate_multi(labels, preds_cmr, cate_ids, metric_scope, isrank, _print))  # [3+2, scope_num, ]
     for j, s in enumerate(params.metric_scope):
-        print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f  EVA_AVE: %.4f" % (
-            s, res[0][j], res[1][j], res[2][j], res[4][j], res[5][j], np.mean(np.array(eva_cmr_ave), axis=0)[j]))
-    # s, res[0][j], res[1][j], res[2][j], res[4][j], 10 * (np.mean(np.array(eva_cmr_ave), axis=0)[j] - 0.9 * res[4][j])))
+        print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f" % (
+            s, res[0][j], res[1][j], res[2][j], res[4][j], res[5][j]))
 
     print("LAST")
     res = list(evaluate_multi(labels, preds_last, cate_ids, metric_scope, isrank, _print))  # [3+2, scope_num, ]
     for j, s in enumerate(params.metric_scope):
-        print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f  EVA_AVE: %.4f" % (
-            s, res[0][j], res[1][j], res[2][j], res[4][j], res[5][j], np.mean(np.array(eva_last_ave), axis=0)[j]))
-    # s, res[0][j], res[1][j], res[2][j], res[4][j], 10 * (np.mean(np.array(eva_last_ave), axis=0)[j] - 0.9 * res[4][j])))
+        print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f" % (
+            s, res[0][j], res[1][j], res[2][j], res[4][j], res[5][j]))
 
     print("EVAL TIME: %.4fs" % (time.time() - t))
 
@@ -130,11 +113,11 @@ def reranker_parse_args():
     parser.add_argument('--reload_path', type=str,
                         #default='./model//save_model_ad/10/202402231212_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
                         #default='./model//save_model_ad/10/202402221850_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
-                        default='./model//save_model_ad/10/202402231212_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
-                        #default='./model//save_model_ad/10/202403042015_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
+                        #default='./model//save_model_ad/10/202402231212_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',   #[15, 20]
+                        #default='./model//save_model_ad/10/202403042015_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',   #[-3, -4]
                         #default='./model//save_model_ad/10/202403042016_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
-                        #default='./model//save_model_ad/10/202403050827_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
-                        #default='./model//save_model_ad/10/202403050828_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',
+                        #default='./model//save_model_ad/10/202403050827_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',   #[4, 8]
+                        default='./model//save_model_ad/10/202403050828_lambdaMART_LAST_generator_16_0.0001_0.0001_64_16_0.8_1.0',   #[6, 10]
                         help='model ckpt dir')
     parser.add_argument('--setting_path', type=str, default='./example/config/ad/last_generator_setting.json',
                         help='setting dir')
@@ -223,21 +206,11 @@ if __name__ == '__main__':
         sess.run(tf.global_variables_initializer())
         model.load(params.reload_path)
 
-    evaluator = LAST_evaluator(num_ft, params.eb_dim, params.hidden_size, max_time_len, itm_spar_fnum,
-                               itm_dens_fnum,
-                               profile_fnum, max_norm=params.max_norm)
-    with evaluator.graph.as_default() as g:
-        sess = tf.Session(graph=g, config=tf.ConfigProto(gpu_options=gpu_options))
-        evaluator.set_sess(sess)
-        sess.run(tf.global_variables_initializer())
-        evaluator.load(params.evaluator_metrics_path)
-
     #loss, res = eval(model, test_lists, params.l2_reg, params.batch_size, True,
-    #                 params.metric_scope, with_evaluator=True,
-    #                 evaluator=evaluator)
+    #                 params.metric_scope, with_evaluator=False)
     #print("CMR")
     #for i, s in enumerate(params.metric_scope):
-    #    print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f  EVA_AVE: %.4f" % (
-    #        s, res[0][i], res[1][i], res[2][i], res[4][i], res[5][i], res[-1][i]))
+    #    print("@%d  MAP: %.4f  NDCG: %.4f  CLICKS: %.4f  ERR_IA: %.4f  ALPHA_NDCG: %.4f" % (
+    #        s, res[0][i], res[1][i], res[2][i], res[4][i], res[5][i]))
     if params.model_type == 'LAST_generator':
-        eval_last(model, test_lists, params.batch_size, True, params.metric_scope, evaluator=evaluator)
+        eval_last(model, test_lists, params.batch_size, True, params.metric_scope)

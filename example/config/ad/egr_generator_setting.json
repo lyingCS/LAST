@@ -14,5 +14,5 @@
   "data_dir": "./Data/ad/",
   "evaluator_path": "./model/save_model_ad/10/202301122354_lambdaMART_EGR_evaluator_16_0.0005_0.0002_64_16_0.8_1.0",
   "controllable": false,
-  "acc_prefer": 0.2
+  "acc_prefer": 1
 }
