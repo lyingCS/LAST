@@ -7,7 +7,7 @@ LAST is an extended version of [LibRerank](https://github.com/LibRerank-Communit
 ### Install repo from source
 
 ```
-git clone this repo
+git clone https://github.com/lyingCS/LAST.git
 cd LAST
 make init 
 ```
