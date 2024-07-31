@@ -36,3 +36,15 @@ python eval_last_model.py --reload_path='path/to/model/you/trained'
 
 **For more information please refer to [LibRerank_README.md](./LibRerank_README.md)**
 
+## Citation
+
+Please cite our paper if you use this repository.
+
+```
+@article{wang2024not,
+  title={Do Not Wait: Learning Re-Ranking Model Without User Feedback At Serving Time in E-Commerce},
+  author={Wang, Yuan and Li, Zhiyu and Zhang, Changshuo and Chen, Sirui and Zhang, Xiao and Xu, Jun and Lin, Quan},
+  journal={arXiv preprint arXiv:2406.14004},
+  year={2024}
+}
+```
