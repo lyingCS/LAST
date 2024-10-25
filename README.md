@@ -41,10 +41,11 @@ python eval_last_model.py --reload_path='path/to/model/you/trained'
 If you find our code or paper useful, please cite the paper:
 
 ```
-@article{wang2024not,
+@inproceedings{wang2024not,
   title={Do Not Wait: Learning Re-Ranking Model Without User Feedback At Serving Time in E-Commerce},
   author={Wang, Yuan and Li, Zhiyu and Zhang, Changshuo and Chen, Sirui and Zhang, Xiao and Xu, Jun and Lin, Quan},
-  journal={arXiv preprint arXiv:2406.14004},
+  booktitle={Proceedings of the 18th ACM Conference on Recommender Systems},
+  pages={896--901},
   year={2024}
 }
 ```
